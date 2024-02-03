@@ -106,13 +106,13 @@ class Loop():
         self.mirror.pause()
         self.sensor.pause()
         self.paused = True
-        logging.info('Loop paused.')
+        logging.debug('loop paused')
         
     def unpause(self):
         self.mirror.unpause()
         self.sensor.unpause()
         self.paused = False
-        logging.info('Loop unpaused')
+        logging.debug('loop unpaused')
 
     def set_safe(self,val):
         self.safe = val
@@ -132,7 +132,7 @@ class Loop():
         if self.profile_update_method:
             self.update_timer.tick('start')
         if not self.paused:
-            logging.info('Updating loop.')
+            logging.debug('updating loop')
 
             self.sensor.update()
 
@@ -181,7 +181,7 @@ class Loop():
                 if self.verbose>=1:
                     error = self.sensor.error
                     pcount = int(round(error*1e8))
-                    print('rms'+'.'*pcount)
+                    logging.debug('rms'+'.'*pcount)
 
                 if self.ready_to_correct:
                     slope_vec = np.hstack((xs,ys))
@@ -194,13 +194,12 @@ class Loop():
                     if self.profile_update_method:
                         self.update_timer.tick('mirror.update')
                     
-                    if self.verbose>=1:
-                        if command.max()>ccfg.mirror_command_max*.99:
-                            print('actuator saturated')
-                        if command.min()<ccfg.mirror_command_min*.99:
-                            print('actuator saturated')
+                    if command.max()>ccfg.mirror_command_max*.99:
+                        logging.info('actuator saturated')
+                    if command.min()<ccfg.mirror_command_min*.99:
+                        logging.info('actuator saturated')
                 else:
-                    print('not ready to correct')
+                    logging.debug('not ready to correct')
 
             self.active_lenslets[:] = current_active_lenslets[:]
 
@@ -213,26 +212,13 @@ class Loop():
         self.finished.emit()
         self.buf.add(list(np.hstack((self.sensor.x_slopes,self.sensor.y_slopes))))
         
-        #if self.buf.full():
-        #    #print(self.buf.buf)
-        #    self.buf.save()
-        #    sys.exit()
-        
         
     def load_poke(self,poke_filename=None):
         try:
             poke = np.loadtxt(poke_filename)
-        except Exception as e:
-            error_message('Could not find %s.'%poke_filename)
-            options = QFileDialog.Options()
-            #options |= QFileDialog.DontUseNativeDialog
-            poke_filename, _ = QFileDialog.getOpenFileName(
-                            None,
-                            "Please select a poke file.",
-                            ccfg.poke_directory,
-                            "Text Files (*.txt)",
-                            options=options)
-            poke = np.loadtxt(poke_filename)
+        except FileNotFoundError as fnfe:
+            logging.critical('poke file %s not found'%poke_filename)
+            logging.critical('exiting')
 
         py,px = poke.shape
         expected_py = self.sensor.n_lenslets*2
@@ -251,10 +237,7 @@ class Loop():
     def invert(self):
         if self.poke is not None:
             self.pause()
-            time.sleep(1)
             self.poke.invert()
-            time.sleep(1)
-            QApplication.processEvents()
             self.unpause()
             time.sleep(.001)
             self.close_ok = ccfg.loop_condition_llim<self.get_condition_number()<ccfg.loop_condition_ulim
@@ -290,7 +273,6 @@ class Loop():
         commands = np.linspace(cmin,cmax,n_commands)
 
         self.pause()
-        time.sleep(1)
         
         n_lenslets = self.sensor.n_lenslets
         n_actuators = self.mirror.n_actuators
@@ -304,10 +286,7 @@ class Loop():
             self.mirror.flatten()
             for k_command in range(n_commands):
                 cur = commands[k_command]+flat[k_actuator]
-                #print k_actuator,cur
                 self.mirror.set_actuator(k_actuator,cur)
-                #print k_actuator,k_command
-                QApplication.processEvents()
                 time.sleep(.01)
                 self.sensor.sense()
                 try:
@@ -315,16 +294,16 @@ class Loop():
                         spots_folder = os.path.join(ccfg.poke_directory,'%s_spots_images'%ns)
                         if not os.path.exists(spots_folder):
                             os.makedirs(spots_folder)
-                        filename = 'spots_%03d_%0.3f.npy'%(k_actuator,cur)
+                        filename = 'spots_%03d_%0.3f.txt'%(k_actuator,cur)
                         image = self.sensor.image
-                        np.save(os.path.join(spots_folder,filename),image)
+                        np.savetxt(os.path.join(spots_folder,filename),image)
                 except AttributeError as ae:
                     print(ae)
                     pass
                         
                 x_mat[:,k_actuator,k_command] = self.sensor.x_slopes
                 y_mat[:,k_actuator,k_command] = self.sensor.y_slopes
-                self.finished.emit()
+                
         # print 'done'
         self.mirror.flatten()
         
