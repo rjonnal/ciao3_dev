@@ -2,23 +2,14 @@ import numpy as np
 import time
 import ciao_config as ccfg
 import sys
-from PyQt5.QtCore import (QThread, QTimer, pyqtSignal, Qt, QPoint, QLine,
-                          QMutex, QObject, pyqtSlot)
-
-from PyQt5.QtWidgets import (QApplication, QPushButton, QWidget,
-                             QHBoxLayout, QVBoxLayout, QGraphicsScene,
-                             QLabel,QGridLayout, QCheckBox, QFrame, QGroupBox,
-                             QSpinBox,QDoubleSpinBox,QSizePolicy,QFileDialog,
-                             QErrorMessage, QSlider)
-from PyQt5.QtGui import QColor, QImage, QPainter, QPixmap, qRgb, QPen, QBitmap, QPalette, QIcon
 import os
 from matplotlib import pyplot as plt
 import datetime
-from .tools import error_message, now_string, prepend, colortable, get_ram, get_process
-from .zernike import Zernike
-from .search_boxes import SearchBoxes
-from .frame_timer import FrameTimer
-from .reference_generator import ReferenceGenerator
+from ciao3_dev.components.tools import error_message, now_string, prepend, colortable, get_ram, get_process
+from ciao3_dev.components.zernike import Zernike
+from ciao3_dev.components.search_boxes import SearchBoxes
+from ciao3_dev.components.frame_timer import FrameTimer
+from ciao3_dev.components.reference_generator import ReferenceGenerator
 
 class Simulator:
 
@@ -306,7 +297,7 @@ class Simulator:
             self.spots = self.interpolate_dirac(xcentroid,ycentroid,self.spots)
             x_slope_vec.append(xslope)
             y_slope_vec.append(yslope)
-            #QApplication.processEvents()
+            
         self.spots = np.abs(np.fft.ifft2(np.fft.fftshift(np.fft.fft2(self.spots))*self.disc))
         self.x_slopes = np.array(x_slope_vec)
         self.y_slopes = np.array(y_slope_vec)

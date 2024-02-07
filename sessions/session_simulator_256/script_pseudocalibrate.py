@@ -2,27 +2,25 @@ import numpy as np
 import time
 from ciao3.components import centroid
 import sys
-
 import os
 from matplotlib import pyplot as plt
 import datetime
-from ciao3_dev.components.tools import error_message, now_string, prepend, colortable, get_ram, get_process, gaussian_convolve
-import copy
-from ciao3_dev.components.zernike import Reconstructor
 import cProfile
-import scipy.io as sio
-from ciao3_dev.components.poke_analysis import save_modes_chart
 from ctypes import CDLL,c_void_p
-from ciao3_dev.components.search_boxes import SearchBoxes
+from ciao3.components.search_boxes import SearchBoxes
 import ciao_config as ccfg
-from ciao3_dev.components.frame_timer import FrameTimer,BlockTimer
-from ciao3_dev.components.beeper import Beeper
 import json
+from ciao3.components.simulator import Simulator
+from ciao3.components import cameras
+from ciao3.components.mirrors import Mirror
+from ciao3.components.ui import UI
+from ciao3.components.frame_timer import FrameTimer
+from ciao3.components.zernike import Reconstructor
+from ciao3.components.tools import error_message, now_string, prepend, colortable, get_ram, get_process
 
 class Sensor:
 
     def __init__(self,camera):
-        self.cam = camera
         self.image_width_px = ccfg.image_width_px
         self.image_height_px = ccfg.image_height_px
         self.dark_image = np.zeros((ccfg.image_height_px,ccfg.image_width_px),dtype=np.int16)
@@ -59,9 +57,8 @@ class Sensor:
         try:
             xy = np.loadtxt(ccfg.reference_coordinates_filename)
         except Exception as e:
-            self.bootstrap_reference()
             xy = np.loadtxt(ccfg.reference_coordinates_bootstrap_filename)
-            #print('Bootstrapping with %s'%ccfg.reference_coordinates_bootstrap_filename)
+            print('Bootstrapping with %s'%ccfg.reference_coordinates_bootstrap_filename)
             
         self.search_boxes = SearchBoxes(xy[:,0],xy[:,1],ccfg.search_box_half_width)
         self.sensor_mask = np.loadtxt(ccfg.reference_mask_filename)
@@ -105,6 +102,7 @@ class Sensor:
         self.image_min = -1
         self.image_mean = -1
         
+        self.cam = camera
         self.frame_timer = FrameTimer('Sensor',verbose=False)
         self.reconstructor = Reconstructor(self.search_boxes.x,
                                            self.search_boxes.y,self.sensor_mask)
@@ -112,11 +110,9 @@ class Sensor:
         self.n_zernike_orders_corrected=self.reconstructor.N_orders
         self.centroiding_time = -1.0
 
-        self.beeper = Beeper()
 
         self.logging = False
         self.paused = False
-        self.sense_timer = BlockTimer('Sensor sense method')
         
         try:
             self.profile_update_method = ccfg.profile_sensor_update_method
@@ -172,120 +168,6 @@ class Sensor:
 
     def get_n_zernike_orders_corrected(self):
         return self.n_zernike_orders_corrected
-
-    def bootstrap_reference(self):
-        output_filename = ccfg.reference_coordinates_bootstrap_filename
-        # collect and average N images
-        im = self.cam.get_image().astype(float)
-        try:
-            N = int(ccfg.reference_n_measurements)
-        except Exception as e:
-            print(e)
-            N = 1
-            
-        for k in range(N-1):
-            im = im + self.cam.get_image()
-        im = im/float(N)
-
-        # Load data and initialize variables.
-        reference_mask = np.loadtxt(ccfg.reference_mask_filename)
-        d_lenslets = reference_mask.shape[0] # assumed to be square
-        pixels_per_lenslet = float(ccfg.lenslet_pitch_m)/float(ccfg.pixel_size_m)
-        total_width = d_lenslets*pixels_per_lenslet
-        border = (im.shape[0]-total_width)/2.0+pixels_per_lenslet/2.0
-
-        # Create a empty array for reference coordinates.
-        ref_xy = []
-
-        # Create a template image with simulated spots based on the reference mask
-        # and pixel size on the sensor.
-        # First, create an empty array with the same size as the camera image, and
-        # put 1's at the expected spot centers, based on the lenslet array
-        # geometry and sensor pixel size. Since these may not be centered on pixels,
-        # interpolate among the four pixels containing the 1.
-        template = np.zeros(im.shape)
-        for ly in range(d_lenslets):
-            for lx in range(d_lenslets):
-                if reference_mask[ly,lx]:
-                    py = border+pixels_per_lenslet*ly
-                    px = border+pixels_per_lenslet*lx
-                    ref_xy.append([px,py])
-                    for ky in [int(np.floor(py)),int(np.ceil(py))]:
-                        for kx in [int(np.floor(px)),int(np.ceil(px))]:
-                            template[ky,kx] = (1.0-abs(ky-py))*(1.0-abs(kx-px))
-
-        # Blur and normalize the fake spots image, and normalize the real image.
-        lenslet_pitch_m = ccfg.lenslet_pitch_m
-        f = ccfg.lenslet_focal_length_m
-        L = ccfg.wavelength_m
-        pixel_size_m = ccfg.pixel_size_m
-        spot_sigma = (1.22*L*f/lenslet_pitch_m)/pixel_size_m
-        template = gaussian_convolve(template,spot_sigma)
-        template = (template-template.mean())/(template.std())
-        im = (im-im.mean())/(im.std())
-
-        # ref_xy contains the coordinates of the lenslet centers, if the lenslet
-        # array were centered on the sensor.
-        ref_xy = np.array(ref_xy)
-
-        # Compute the corss-correlation between the real image and the fake one,
-        # in order to determine the displacements of the real spots from those
-        # stored in ref_xy.
-        nxc = np.abs(np.fft.ifft2(np.fft.fft2(template)*np.fft.fft2(im)))
-        py,px = np.unravel_index(np.argmax(nxc),nxc.shape)
-        sy,sx = nxc.shape
-        if py>=sy//2:
-            py = py - sy
-        if px>=sx//2:
-            px = px - sx
-
-        # Correct ref_xy accordingly.
-        ref_xy = ref_xy+np.array([px,py])
-
-        if False:
-            # Plot
-            m1x = 'Please adjust x coordinates of reference as necessary.'
-            m1y = 'Please adjust y coordinates of reference as necessary.'
-            m2x = 'To shift by a whole column, enter an integer.'
-            m2y = 'To shift by a whole row, enter an integer.'
-            m3 = 'To shift by pixels enter a floating point number, e.g. 1.5, -3.0.'
-            m4 = 'Enter 0 to finish.'
-            while True:
-                plt.subplot(1,2,1)
-                plt.cla()
-                plt.imshow(template,cmap='gray')
-                plt.subplot(1,2,2)
-                plt.cla()
-                plt.imshow(im,cmap='gray')
-                plt.plot(ref_xy[:,0],ref_xy[:,1],'rx')
-                plt.pause(.1)
-                answer = input('%s\n%s\n%s\n%s\n'%(m1x,m2x,m3,m4))
-                if answer=='0':
-                    break
-                elif answer.find('.')>-1:
-                    ref_xy[:,0] = ref_xy[:,0] + float(answer)
-                else:
-                    ref_xy[:,0] = ref_xy[:,0] + int(answer)*pixels_per_lenslet
-            while True:
-                plt.subplot(1,2,1)
-                plt.cla()
-                plt.imshow(template,cmap='gray')
-                plt.subplot(1,2,2)
-                plt.cla()
-                plt.imshow(im,cmap='gray')
-                plt.plot(ref_xy[:,0],ref_xy[:,1],'rx')
-                plt.pause(.1)
-                answer = input('%s\n%s\n%s\n%s\n'%(m1y,m2y,m3,m4))
-                if answer=='0':
-                    break
-                elif answer.find('.')>-1:
-                    ref_xy[:,1] = ref_xy[:,1] + float(answer)
-                else:
-                    ref_xy[:,1] = ref_xy[:,1] + int(answer)*pixels_per_lenslet
-
-            # And save the output
-        np.savetxt(output_filename,ref_xy,fmt='%0.3f')
-
 
     def set_n_zernike_orders_corrected(self,n):
         self.n_zernike_orders_corrected = n
@@ -422,13 +304,8 @@ class Sensor:
         
     def sense(self,debug=False):
 
-        if self.profile_update_method:
-            self.sense_timer.tick('start')
             
         self.image = self.cam.get_image()
-
-        if self.profile_update_method:
-            self.sense_timer.tick('cam.get_image')
         
         if self.dark_subtract:
             self.image = self.image - self.dark_image
@@ -436,9 +313,6 @@ class Sensor:
         self.image_min = self.image.min()
         self.image_mean = self.image.mean()
         self.image_max = self.image.max()
-        
-        if self.profile_update_method:
-            self.sense_timer.tick('image stats')
             
         
         t0 = time.time()
@@ -451,8 +325,6 @@ class Sensor:
                                               sb_half_width_p = self.search_boxes.half_width)
                 self.box_backgrounds = self.box_backgrounds + self.background_correction
                 
-            if self.profile_update_method:
-                self.sense_timer.tick('estimate background')
             centroid.compute_centroids(spots_image=self.image,
                                        sb_x_vec = self.search_boxes.x,
                                        sb_y_vec = self.search_boxes.y,
@@ -466,8 +338,6 @@ class Sensor:
                                        maximum_intensity = self.box_maxes,
                                        minimum_intensity = self.box_mins,
                                        num_threads_p = 1)
-            if self.profile_update_method:
-                self.sense_timer.tick('centroid')
         else:
             centroid.fast_centroids(spots_image=self.image,
                                     sb_x_vec = self.search_boxes.x,
@@ -494,8 +364,6 @@ class Sensor:
             
         if self.reconstruct_wavefront:
             self.zernikes,self.wavefront,self.error = self.reconstructor.get_wavefront(self.x_slopes,self.y_slopes)
-            if self.profile_update_method:
-                self.sense_timer.tick('reconstruct wavefront')
             
             
             self.filter_slopes = self.n_zernike_orders_corrected<self.reconstructor.N_orders
@@ -532,16 +400,7 @@ class Sensor:
                 self.x_slopes = filtered_slopes[:self.n_lenslets]
                 self.y_slopes = filtered_slopes[self.n_lenslets:]
             
-        if self.profile_update_method:
-            self.sense_timer.tick('end sense')
-            self.sense_timer.tock()
             
-        try:
-            self.beeper.beep(self.error)
-        except Exception as e:
-            print(e)
-            print(self.error)
-            sys.exit()
 
 
     def record_reference(self):
@@ -626,7 +485,6 @@ class Sensor:
             for y in range(mask_sy):
                 for x in range(mask_sx):
                     if mask[y,x]:
-                        print(y,x)
                         y_m = y*self.lenslet_pitch_m
                         y_px = y_m/self.pixel_size_m+border
                         x_m = x*self.lenslet_pitch_m
@@ -642,6 +500,32 @@ class Sensor:
         new_yref = np.array(new_yref)
 
 
+        sigma = 10.0
+        xx = XX-sx/2.0
+        yy = YY-sy/2.0
+        g = np.exp(-(xx**2+yy**2)/(2*sigma**2))+1
+        spots_spectrum = np.fft.fft2(spots)
+        
+        filt = 1.0/g
+        plt.figure()
+        plt.imshow(np.log10(np.abs(spots_spectrum)))
+        plt.colorbar()
+        plt.figure()
+        plt.imshow(g)
+        plt.colorbar()
+        plt.figure()
+        plt.imshow(filt)
+        plt.colorbar()
+        #spots = np.fft.fftshift(np.real(np.fft.ifft2(np.fft.fft2(spots)*np.fft.fft2(filt))))
+        plt.figure()
+        plt.imshow(spots)
+        plt.colorbar()
+        spots = np.real(np.fft.ifft2(spots_spectrum*np.fft.fft2(filt)))
+        plt.figure()
+        plt.imshow(spots)
+        plt.colorbar()
+        plt.show()
+        sys.exit()
         nxc = np.real(np.fft.ifft2(np.fft.fft2(spots)*np.conj(np.fft.fft2(spots_model))))
         peaky,peakx = np.unravel_index(np.argmax(nxc),nxc.shape)
         
@@ -680,44 +564,41 @@ class Sensor:
         myerr = np.mean(yerr)
 
         # # as a sanity check, let's move through a range of offsets to see what the minimum tip and tilt are
-        # sbx = self.search_boxes.x
-        # sby = self.search_boxes.y
-        # step = 0.1
-        # grid = np.arange(-2,2,step)
-        # tip = np.zeros(len(grid))
-        # tilt = np.zeros(len(grid))
+        sbx = self.search_boxes.x
+        sby = self.search_boxes.y
+        step = 0.1
+        grid = np.arange(-2,2,step)
+        tip = np.zeros(len(grid))
+        tilt = np.zeros(len(grid))
 
-        # for xidx,dx in enumerate(grid):
-            # self.search_boxes.move(sbx+dx,sby)
-            # self.sense()
-            # tilt[xidx] = self.zernikes[2]
+        for xidx,dx in enumerate(grid):
+            self.search_boxes.move(sbx+dx,sby)
+            self.sense()
+            tilt[xidx] = self.zernikes[2]
                         
-        # for yidx,dy in enumerate(grid):
-            # self.search_boxes.move(sbx,sby+dy)
-            # self.sense()
-            # tip[yidx] = self.zernikes[1]
-
-        # return
+        for yidx,dy in enumerate(grid):
+            self.search_boxes.move(sbx,sby+dy)
+            self.sense()
+            tip[yidx] = self.zernikes[1]
 
 
-        # mxerr2 = grid[np.argmin(np.abs(tilt))]
-        # myerr2 = grid[np.argmin(np.abs(tip))]
+        mxerr2 = grid[np.argmin(np.abs(tilt))]
+        myerr2 = grid[np.argmin(np.abs(tip))]
 
-        # try:
-            # # assert that the difference between the brute force zernike minimization and the bulk x and y errors
-            # # are smaller than the step size; this assures us that the bulk estimate is a good way to center the search
-            # # boxes
-            # assert np.abs(mxerr-mxerr2)<step
-            # assert np.abs(myerr-myerr2)<step
-        # except AssertionError:
-            # sys.exit('Problem with tip tilt estimation in pseudocalibration. Bulk tip and tilt, calculated from average x and y dimension centroid error, does not match zernike minimization values. mxerr=%0.3f,mxerr2=%0.3f; myerr=%0.3f,myerr2=%0.3f.'%(mxerr,mxerr2,myerr,myerr2))
+        try:
+            # assert that the difference between the brute force zernike minimization and the bulk x and y errors
+            # are smaller than the step size; this assures us that the bulk estimate is a good way to center the search
+            # boxes
+            assert np.abs(mxerr-mxerr2)<step
+            assert np.abs(myerr-myerr2)<step
+        except AssertionError:
+            print('Warning: problem with tip tilt estimation in pseudocalibration. Bulk tip and tilt, calculated from average x and y dimension centroid error, does not match zernike minimization values. mxerr=%0.3f,mxerr2=%0.3f; myerr=%0.3f,myerr2=%0.3f.'%(mxerr,mxerr2,myerr,myerr2))
             
         new_xref = new_xref + mxerr
         new_yref = new_yref + myerr
 
         self.search_boxes = SearchBoxes(new_xref,new_yref,self.search_boxes.half_width)
-        self.search_boxes.move(new_xref,new_yref)
-        
+
         # Record the new reference set to two locations, the
         # filename specified by reference_coordinates_filename
         # in ciao config, and also an archival filename to keep
@@ -734,7 +615,7 @@ class Sensor:
         np.savetxt(ccfg.reference_coordinates_filename,refxy,fmt='%0.3f')
         self.unpause()
 
-        if False:
+        if True:
             plt.figure()
             plt.subplot(2,4,1)
             plt.imshow(spots,cmap='gray')
@@ -771,10 +652,21 @@ class Sensor:
             plt.text(plt.gca().get_xlim()[0],plt.gca().get_ylim()[1],'remove_tip_tilt=%s'%ccfg.sensor_remove_tip_tilt,ha='left',va='top')
             plt.axvline(myerr)
             plt.pause(.1)
-
+            plt.show()
             plt.savefig(outfn)
             plt.close()
             
             
         
         
+if __name__=='__main__':
+    if ccfg.simulate:
+        sim = Simulator()
+        sensor = Sensor(sim)
+        mirror = sim
+    else:
+        cam = cameras.get_camera()
+        mirror = Mirror()
+        sensor = Sensor(cam)
+
+sensor.pseudocalibrate()

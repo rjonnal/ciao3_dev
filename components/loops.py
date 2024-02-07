@@ -209,7 +209,6 @@ class Loop():
             self.update_timer.tick('end update')
             self.update_timer.tock()
             
-        self.finished.emit()
         self.buf.add(list(np.hstack((self.sensor.x_slopes,self.sensor.y_slopes))))
         
         
@@ -342,11 +341,9 @@ class Loop():
         self.closed = val
 
 
-class SerialLoop(QObject):
+class SerialLoop:
 
     def __init__(self,sensor,mirror,verbose=0):
-        super(SerialLoop,self).__init__()
-
         self.verbose = verbose
         
         self.sensor = sensor

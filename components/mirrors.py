@@ -2,29 +2,20 @@ import numpy as np
 import time
 from . import centroid
 import sys
-from PyQt5.QtCore import (QThread, QTimer, pyqtSignal, Qt, QPoint, QLine,
-                          QMutex, QObject, pyqtSlot)
-
-from PyQt5.QtWidgets import (QApplication, QPushButton, QWidget,
-                             QHBoxLayout, QVBoxLayout, QGraphicsScene,
-                             QLabel,QGridLayout, QCheckBox, QFrame, QGroupBox,
-                             QSpinBox,QDoubleSpinBox,QSizePolicy,QFileDialog,
-                             QErrorMessage, QSlider)
-from PyQt5.QtGui import QColor, QImage, QPainter, QPixmap, qRgb, QPen, QBitmap, QPalette, QIcon
 import os
 from matplotlib import pyplot as plt
 import datetime
-from .tools import error_message, now_string, prepend, colortable, get_ram, get_process
+from ciao3_dev.components.tools import error_message, now_string, prepend, colortable, get_ram, get_process
 import copy
-from .zernike import Reconstructor
+from ciao3_dev.components.zernike import Reconstructor
 import cProfile
 import scipy.io as sio
-from .poke_analysis import save_modes_chart
+from ciao3_dev.components.poke_analysis import save_modes_chart
 from ctypes import CDLL,c_void_p
-from .search_boxes import SearchBoxes
-from .reference_generator import ReferenceGenerator
+from ciao3_dev.components.search_boxes import SearchBoxes
+from ciao3_dev.components.reference_generator import ReferenceGenerator
 import ciao_config as ccfg
-from .frame_timer import FrameTimer
+from ciao3_dev.components.frame_timer import FrameTimer
 import json
 
 class MirrorController(object):
@@ -114,23 +105,6 @@ class MirrorControllerPythonOld(MirrorController):
 class Mirror:
     def __init__(self):
         
-        # try:
-        #     self.controller = MirrorControllerPython()
-        #     print('Mirror python initialization succeeded.')
-        # except Exception as e:
-        #     print('Mirror python initialization failed:',e)
-        #     try:
-        #         self.controller = MirrorControllerPythonOld()
-        #         print('Mirror python (old style) initialization succeeded.')
-        #     except Exception as e:
-        #         print('Mirror python (old style) initialization failed:',e)
-        #         try:
-        #             self.controller = MirrorControllerCtypes()
-        #             print('Mirror c initialization succeeded.')
-        #         except Exception as e:
-        #             print(e)
-        #             print('No mirror driver found. Using virtual mirror.')
-        #             self.controller = MirrorController()
         self.controller = MirrorControllerPython()
         self.mirror_mask = np.loadtxt(ccfg.mirror_mask_filename)
         self.n_actuators = ccfg.mirror_n_actuators

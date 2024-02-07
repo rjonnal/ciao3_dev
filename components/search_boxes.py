@@ -1,9 +1,8 @@
-from PyQt5.QtCore import QObject
 import numpy as np
 import sys
 import ciao_config as ccfg
 
-class SearchBoxes(QObject):
+class SearchBoxes:
 
     def __init__(self,x,y,half_width):
         super(SearchBoxes,self).__init__()
