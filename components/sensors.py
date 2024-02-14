@@ -592,9 +592,11 @@ class Sensor:
         self.sense()
 
         spots = self.image
+        plt.imshow(spots)
+        plt.show()
+        sys.exit()
         spots_model = np.zeros(spots.shape)
         sx,sy = spots.shape
-        
         
         mask = self.sensor_mask
         mask_sy,mask_sx = mask.shape
@@ -618,8 +620,6 @@ class Sensor:
                     new_xref.append(x_px)
                     new_yref.append(y_px)
 
-
-        
         try:
             spots_model = np.load(spots_model_fn)
         except:
@@ -640,7 +640,6 @@ class Sensor:
 
         new_xref = np.array(new_xref)
         new_yref = np.array(new_yref)
-
 
         nxc = np.real(np.fft.ifft2(np.fft.fft2(spots)*np.conj(np.fft.fft2(spots_model))))
         peaky,peakx = np.unravel_index(np.argmax(nxc),nxc.shape)
