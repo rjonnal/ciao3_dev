@@ -8,7 +8,6 @@ cam = simulator.Simulator()
 mirror = cam
 sensor = sensors.Sensor(cam)
 loop = loops.Loop(sensor,mirror)
-loop.run_poke()
 
 for k in range(10):
     loop.update()

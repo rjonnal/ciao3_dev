@@ -58,7 +58,7 @@ sensor_reconstruct_wavefront = True
 sensor_remove_tip_tilt = False
 centroiding_num_threads = 1
 iterative_centroiding_step = 2
-centroiding_iterations = 5
+centroiding_iterations = 2
 use_dark_subtraction = False
 
 mirror_update_rate = 1.0 # deprecated in current version
@@ -73,6 +73,7 @@ poke_command_max = 0.1
 poke_command_min = -0.1
 poke_n_command_steps = 5
 poke_invert_on_demand = False
+save_poke_matrix_spots_images = False
 
 ctrl_dictionary_max_size = 10
 

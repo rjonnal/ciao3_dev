@@ -421,7 +421,6 @@ class Sensor:
         self.centroiding_half_width = val
         
     def sense(self,debug=False):
-
         if self.profile_update_method:
             self.sense_timer.tick('start')
             
@@ -592,9 +591,6 @@ class Sensor:
         self.sense()
 
         spots = self.image
-        plt.imshow(spots)
-        plt.show()
-        sys.exit()
         spots_model = np.zeros(spots.shape)
         sx,sy = spots.shape
         

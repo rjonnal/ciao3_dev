@@ -96,8 +96,8 @@ class Loop():
         except:
             self.profile_update_method = False
 
-    def __del__(self):
-        self.buf.save()
+#    def __del__(self):
+#        self.buf.save()
         
     def has_poke(self):
         return self.poke is not None
@@ -285,8 +285,9 @@ class Loop():
             self.mirror.flatten()
             for k_command in range(n_commands):
                 cur = commands[k_command]+flat[k_actuator]
+                print('Actuator %d, current  %0.2f.'%(k_actuator,cur))
                 self.mirror.set_actuator(k_actuator,cur)
-                time.sleep(.01)
+                time.sleep(.001)
                 self.sensor.sense()
                 try:
                     if ccfg.save_poke_matrix_spots_images:

@@ -123,8 +123,10 @@ cpdef compute_centroids(np.ndarray[np.int16_t,ndim=2] spots_image,
             y1 = int(round(y_out[k_spot]))-sb_half_width+k_iteration*iteration_step_px
             y2 = int(round(y_out[k_spot]))+sb_half_width-k_iteration*iteration_step_px
 
+            
+
             if x1<0 or x2>sx-1 or y1<0 or y2>sy-1:
-                printf("Search box x=(%ld,%ld),y=(%ld,%ld) extends beyond image edge. Possibly search box width too large.\n",x1,x2,y1,y2)
+                printf("Search box x=(%ld,%ld),y=(%ld,%ld) extends beyond image edge. Possibly search box width too large, number of iterations too high,  or iteration step size too high.\n",x1,x2,y1,y2)
                 #exit(0)
 
             if x1>=x2 or y1>=y2:

@@ -1,56 +1,62 @@
+import centroid
 from matplotlib import pyplot as plt
 import glob,sys,os
 import numpy as np
 from time import time
-from ciao3.components import centroid
+import centroid
 
-image_width = 2048
-fractional_spot_positions = np.arange(0.1,0.9,0.03)
-
-#fractional_spot_positions = np.array([0.3,0.5,0.7])
-spot_positions = fractional_spot_positions*image_width
-
-border = fractional_spot_positions[0]-np.mean(np.diff(fractional_spot_positions))
-spots_image = np.zeros((image_width,image_width),dtype=np.int16)
-
-XX,YY = np.meshgrid(spot_positions,spot_positions)
-
-sb_x_vec = XX.ravel()
-sb_y_vec = YY.ravel()
-
+image_width = 33
+sb_x_vec = np.array([image_width/2.0-0.5])
+sb_y_vec = np.array([image_width/2.0-0.5])
 valid_vec = np.ones(sb_x_vec.shape,dtype=np.int16)
-
-sb_half_width = int(round(1/float(len(sb_x_vec))*image_width))-1
-centroiding_half_width = 10
-
+sb_half_width = image_width//2-1
+centroiding_half_width = sb_half_width-2
 xout = np.zeros(sb_x_vec.shape)
 yout = np.zeros(sb_y_vec.shape)
 max_intensity = np.zeros(sb_x_vec.shape)
-
 n_spots = len(sb_x_vec)
+A = 2000 # express in camera ADU
+DC = 100 # express in camera ADU
+x = np.arange(image_width)
+x = x-np.mean(x)
+XX,YY = np.meshgrid(x,x)
+bit_depth=12
 
-if False:
-# generate some random blobs around the SB centers
-    for spot in range(n_spots):
-        for dx in range(-1,2):
-            for dy in range(-1,2):
-                yput,xput = int(round(sb_y_vec[spot]))+dy,int(round(sb_x_vec[spot]))+dx
-                spots_image[yput,xput] = np.random.rand()*1000.0
+def make_spot(dx=0.0,dy=0.0,sigma=3.0,dc=DC,amplitude=A,noise_gain=1.0):
+    xx = XX-dx
+    yy = YY-dy
+    light = np.exp(-(xx**2+yy**2)/(2*sigma**2))*amplitude
+    shot_noise = np.random.randn(light.shape[0],light.shape[1])*np.sqrt(light)
+    read_noise = np.random.randn(light.shape[0],light.shape[1])
+    # assume discretization @ read noise level, so read noise should have STD of 1
+    total_noise = noise_gain*(shot_noise+read_noise)
+    im = light+dc+total_noise
+    im = np.clip(np.round(im).astype(np.int16),0,2**bit_depth)
+    return im
 
-x_spot_location = []
-y_spot_location = []
 
+def center_of_mass(spots_image,refx,refy,sb_half_width,do_plot=False):
+    x1 = int(round(refx-sb_half_width))
+    x2 = int(round(refx+sb_half_width))
+    y1 = int(round(refy-sb_half_width))
+    y2 = int(round(refy+sb_half_width))
 
-for spot in range(n_spots):
-    dx = np.random.randint(-1,2)
-    dy = np.random.randint(-1,2)
-    yput,xput = int(round(sb_y_vec[spot]))+dy,int(round(sb_x_vec[spot]))+dx
-    spots_image[yput,xput] = 1000.0
-    x_spot_location.append(xput)
-    y_spot_location.append(yput)
+    subim = spots_image[y1:y2+1,x1:x2+1]
+    v = np.arange(-sb_half_width,sb_half_width+1)
+    xx,yy = np.meshgrid(refx+v,refy+v)
+    xc = np.sum(xx*subim)/np.sum(subim)
+    yc = np.sum(yy*subim)/np.sum(subim)
 
-x_spot_location = np.array(x_spot_location)
-y_spot_location = np.array(y_spot_location)
+    if do_plot:
+        plt.imshow(spots_image,cmap='gray')
+        plt.plot([x1,x2,x2,x1,x1],[y1,y1,y2,y2,y1],'r-')
+        plt.plot(xc,yc,'gx')
+    
+    return xc,yc
+
+spot = make_spot(dx=0.5,dy=0.5,noise_gain=0.0,sigma=0.5,dc=0,amplitude=1000.0)
+xcom,ycom = center_of_mass(spot,sb_x_vec,sb_y_vec,sb_half_width,do_plot=False)
+
 
 def fast_centroids(spots_image,sb_x_vec,sb_y_vec,sb_half_width,centroiding_half_width,verbose=False):
     n_spots = len(sb_x_vec)
@@ -65,7 +71,7 @@ def fast_centroids(spots_image,sb_x_vec,sb_y_vec,sb_half_width,centroiding_half_
         y2 = int(round(sb_y_vec[spot_index]+sb_half_width))
 
         if verbose:
-            print(('python A',spot_index,x1,x2,y1,y2))
+            print 'python A',spot_index,x1,x2,y1,y2
         
         for y in range(y1,y2+1):
             for x in range(x1,x2+1):
@@ -81,7 +87,7 @@ def fast_centroids(spots_image,sb_x_vec,sb_y_vec,sb_half_width,centroiding_half_
         y2 = int(round(max_y+centroiding_half_width))
 
         if verbose:
-            print(('python B',spot_index,x1,x2,y1,y2))
+            print 'python B',spot_index,x1,x2,y1,y2
         
         xnum = 0.0
         ynum = 0.0
@@ -99,6 +105,17 @@ def fast_centroids(spots_image,sb_x_vec,sb_y_vec,sb_half_width,centroiding_half_
 
     return x_out,y_out
 
+
+centroid.fast_centroids(spot,sb_x_vec,sb_y_vec,sb_half_width,centroiding_half_width,xout,yout,max_intensity,valid_vec,0,1)
+
+pxout,pyout = fast_centroids(spot,sb_x_vec,sb_y_vec,sb_half_width,centroiding_half_width,verbose=False)
+
+print xcom,ycom
+print xout,yout
+print pxout,pyout
+sys.exit()
+
+
 centroid.fast_centroids(spots_image,sb_x_vec,sb_y_vec,sb_half_width,centroiding_half_width,xout,yout,max_intensity,valid_vec,0,1)
 pxout,pyout = fast_centroids(spots_image,sb_x_vec,sb_y_vec,sb_half_width,centroiding_half_width)
 
@@ -106,13 +123,13 @@ python_cython_err = (xout-pxout).tolist()+(yout-pyout).tolist()
 if any(python_cython_err):
     sys.exit('Error between Cython centroiding and Python centroiding. Please fix.')
 else:
-    print('Cython centroid centers of mass match pure Python calculations.')
+    print 'Cython centroid centers of mass match pure Python calculations.'
     
 cython_ground_truth_err = (xout-x_spot_location).tolist()+(yout-y_spot_location).tolist()
 if any(cython_ground_truth_err):
     sys.exit('Error between Cython centroiding and ground truth. Please fix.')
 else:
-    print('Cython centroid centers of mass match ground truth.')
+    print 'Cython centroid centers of mass match ground truth.'
 
 N = 1000
 t0 = time()
@@ -123,15 +140,4 @@ t_total = time()-t0
 t_iteration = t_total/float(N)
 fps = 1.0/t_iteration
 
-print(('Compiled centroiding: %d spots, %d iterations, total time %0.1f, iteration time %0.1e, fps %0.1f'%(n_spots,N,t_total,t_iteration,fps)))
-
-N = 10
-t0 = time()
-for k in range(N):
-    fast_centroids(spots_image,sb_x_vec,sb_y_vec,sb_half_width,centroiding_half_width)
-
-t_total = time()-t0
-t_iteration = t_total/float(N)
-fps = 1.0/t_iteration
-
-print(('Interpreted centroiding: %d spots, %d iterations, total time %0.1f, iteration time %0.1e, fps %0.1f'%(n_spots,N,t_total,t_iteration,fps)))
+print '%d spots, %d iterations, total time %0.1f, iteration time %0.1e, fps %0.1f'%(n_spots,N,t_total,t_iteration,fps)
