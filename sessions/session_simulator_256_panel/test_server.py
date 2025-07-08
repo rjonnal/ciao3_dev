@@ -6,10 +6,10 @@ from ciao3_dev.components import sensors,loops
 import sys,os
 from matplotlib import pyplot as plt
 
-pn.extension()
+#pn.extension()
 from streamz import Stream
 
-#pn.extension('vega')
+pn.extension('vega')
 
 
 # Widgets
@@ -54,6 +54,7 @@ app = pn.Column(pn.pane.Markdown("# CIAO Wavefront Sensor"),
                                  pause_button,
                                  width=400),
                        pn.Column(result_display,
+                                 streamz_pane,
                                  width=400),
                        width=800))
 #servable
