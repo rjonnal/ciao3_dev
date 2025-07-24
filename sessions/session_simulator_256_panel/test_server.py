@@ -27,7 +27,6 @@ font-size: 10px;
 pn.extension(raw_css=[css])
 
 pn.extension(raw_css=[css])
-from streamz import Stream
 
 #pn.extension('vega')
 #pn.extension('ipywidgets')
