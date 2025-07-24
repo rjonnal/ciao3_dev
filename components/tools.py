@@ -1,6 +1,4 @@
 import sys, os
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QErrorMessage
 from matplotlib import pyplot as plt
 import datetime
 import psutil

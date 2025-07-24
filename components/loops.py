@@ -341,6 +341,12 @@ class Loop():
     def set_closed(self,val):
         self.closed = val
 
+    def close(self):
+        self.closed = True
+
+    def open(self):
+        self.closed = False
+
 
 class SerialLoop:
 

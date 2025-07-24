@@ -1,6 +1,6 @@
 import numpy as np
 import time
-from ciao3.components import centroid
+from ciao3_dev.components import centroid
 import sys
 
 import os
