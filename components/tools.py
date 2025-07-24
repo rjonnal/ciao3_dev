@@ -3,7 +3,6 @@ from matplotlib import pyplot as plt
 import datetime
 import psutil
 import numpy as np
-from PyQt5.QtGui import qRgb
 import time
 import scipy.signal as sps
 
