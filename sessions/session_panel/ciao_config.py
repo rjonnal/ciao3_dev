@@ -18,9 +18,10 @@ mirror_id = 'HSDM97-15-010'
 camera_id = 'pylon'
 
 import os # 
-image_width_px = 300
-image_height_px = 300
-bit_depth = 12
+image_width_px = 2048
+image_height_px = 2048
+bit_depth = 8
+pixel_format = 'Mono8'
 
 ciao_session = '.'
 ciao_session = os.path.split(__file__)[0]
@@ -86,7 +87,6 @@ loop_condition_llim = 1.0
 
 n_zernike_terms = 66
 zernike_dioptric_equivalent = 1.5
-
 
 # UI settings:
 ui_width_px = 1200
