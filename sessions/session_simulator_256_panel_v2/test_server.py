@@ -2,7 +2,6 @@ import panel as pn
 import random
 from ciao3_dev.components import simulator
 from ciao3_dev.components import sensors,loops
-from ciao3_dev.components import sensors,loops
 import sys,os
 from matplotlib import pyplot as plt
 import numpy as np
@@ -27,6 +26,7 @@ font-size: 10px;
 pn.extension(raw_css=[css])
 
 pn.extension(raw_css=[css])
+from streamz import Stream
 
 #pn.extension('vega')
 #pn.extension('ipywidgets')
@@ -58,7 +58,7 @@ ax4.set_xlabel('iteration')
 
 iterations = list(np.arange(-99,1))
 
-h1 = ax1.imshow(sensor.image,clim=(0,1),cmap='gray')
+h1 = ax1.imshow(sensor.image,clim=(0,4095),cmap='gray')
 h2 = ax2.imshow(sensor.wavefront,cmap='jet')
 zidx = np.arange(len(sensor.zernikes))
 h3 = ax3.plot(zidx,sensor.zernikes,'ks',markersize=2,linestyle='none')
@@ -68,9 +68,6 @@ h4 = ax4.plot(iterations,error_buffer,'b-')
 # Widgets
 exposure_time_input = pn.widgets.IntInput(name='Exposure Time (ms)', value=150)
 background_adjustment_input = pn.widgets.IntInput(name='Background Adjustemnt (ADU)', value=0)
-clim_lower = pn.widgets.IntInput(name='Lower Contrast Limit (ADU)', value=0)
-clim_upper = pn.widgets.IntInput(name='Upper Contrast Limit (ADU)', value=4096)
-
 run_toggle = pn.widgets.button.Toggle(name='Run', button_type='primary')
 download_button = pn.widgets.Button(name='Download data', button_type='primary')
 calibrate_button = pn.widgets.Button(name='Record reference', button_type='primary')
@@ -95,6 +92,7 @@ def emit_count():
     global ax1,ax2,ax3,ax4,iterations
 
 
+    
     sensor.cam.set_exposure(1000*exposure_time_input.value)
     sensor.background_correction = background_adjustment_input.value
     sensor.sense()
@@ -105,12 +103,7 @@ def emit_count():
     error_buffer = error_buffer[1:]
     error_buffer.append(sensor.error*1e6)
 
-    im = sensor.image
-    im = im - background_adjustment_input.value
-    im = (im - clim_lower.value)/(clim_upper.value - clim_lower.value)
-
-    
-    h1.set_data(im)
+    h1.set_data(sensor.image-background_adjustment_input.value)
     h2.set_data(sensor.wavefront)
 
     zernikes = sensor.zernikes*1e6
@@ -135,8 +128,6 @@ pn.state.add_periodic_callback(emit_count, period=100, count=999);
 app = pn.Row(pn.Column(pn.pane.Markdown("**CIAO Wavefront Sensor**"),
                        exposure_time_input,
                        background_adjustment_input,
-                       clim_lower,
-                       clim_upper,
                        run_toggle,
                        download_button,
                        calibrate_button,
