@@ -11,21 +11,19 @@ pn.extension('terminal')
 
 css = '''
 .bk.panel-widget-box {
-font-size: 10px;
+font-size: 6px;
 }
 .bk-input-group {
-font-size: 10px;
+font-size: 6px;
 }
 .bk-input {
-font-size: 10px;
+font-size: 6px;
 }
 .bk-btn {
-font-size: 10px;
+font-size: 6px;
 }
 
 '''
-
-pn.extension(raw_css=[css])
 
 pn.extension(raw_css=[css])
 
@@ -122,8 +120,9 @@ def emit():
     im = sensor.image
     immax = np.max(im)
     immin = np.min(im)
-
-    terminal.write('%d (max) %d (min)\n'%(immax,immin))
+    immean = np.mean(im)
+    
+    terminal.write('%d (min) %d (mean) %d (max)\n'%(immin,immean,immax))
     
     im = im - background_adjustment_input.value
     im = (im - clim_lower_input.value)/(clim_upper_input.value - clim_lower_input.value)
@@ -146,7 +145,7 @@ def emit():
     mpl_pane.object = sensor_figure
     count += 1
 
-pn.state.add_periodic_callback(emit, period=100, count=999);
+pn.state.add_periodic_callback(emit, period=200, count=999);
 
 
 # Layout
