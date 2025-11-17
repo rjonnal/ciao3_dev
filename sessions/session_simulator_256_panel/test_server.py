@@ -7,6 +7,7 @@ import sys,os
 from matplotlib import pyplot as plt
 import numpy as np
 
+pn.extension('terminal')
 
 css = '''
 .bk.panel-widget-box {
@@ -40,8 +41,14 @@ sensor.sense()
 error_buffer = [0]*100
 
 # Set up sensor figure
-sensor_figure = plt.figure(figsize=(4,3))
-[[ax1,ax2],[ax3,ax4]] = sensor_figure.subplots(2,2)
+sensor_figure = plt.figure(figsize=(5,3))
+#[[ax1,ax2],[ax3,ax4]] = sensor_figure.subplots(2,2)
+
+border = .03
+ax1 = sensor_figure.add_axes([0,0,.67,1.0])
+ax2 = sensor_figure.add_axes([.67+border,.67+border,.33-border*2,.33-border*2])
+ax3 = sensor_figure.add_axes([.67+border,.33+border,.33-border*2,.33-border*2])
+ax4 = sensor_figure.add_axes([.67+border,border,.33-border*2,.33-border*2])
 ax1.set_title('spots')
 ax1.set_xticks([])
 ax1.set_yticks([])
@@ -66,18 +73,25 @@ h4 = ax4.plot(iterations,error_buffer,'b-')
 
 
 # Widgets
-exposure_time_input = pn.widgets.IntInput(name='Exposure Time (ms)', value=150)
-background_adjustment_input = pn.widgets.IntInput(name='Background Adjustemnt (ADU)', value=0)
-clim_lower = pn.widgets.IntInput(name='Lower Contrast Limit (ADU)', value=0)
-clim_upper = pn.widgets.IntInput(name='Upper Contrast Limit (ADU)', value=4096)
+exposure_time_input = pn.widgets.IntSlider(name='Exposure Time (ms)', start=10,end=1000,step=10,value=150)
+#background_adjustment_input = pn.widgets.IntInput(name='Background Adjustemnt (ADU)', value=0)
+
+background_adjustment_input = pn.widgets.IntSlider(name='Background Adjustment',start=0,end=4095,step=1,value=0)
+clim_lower_input = pn.widgets.IntSlider(name='Lower Contrast Limt',start=0,end=4095,step=1,value=0)
+clim_upper_input = pn.widgets.IntSlider(name='Upper Contrast Limt',start=0,end=4095,step=1,value=4095)
+
 
 run_toggle = pn.widgets.button.Toggle(name='Run', button_type='primary')
 download_button = pn.widgets.Button(name='Download data', button_type='primary')
 calibrate_button = pn.widgets.Button(name='Record reference', button_type='primary')
-mpl_pane = pn.pane.Matplotlib(sensor_figure, dpi=150)
 
-def increment(x):
-    return x + 1
+terminal = pn.widgets.Terminal(
+    "Spots image statistics\n",
+    options={"cursorBlink": True}, width=280,
+    height=200
+)
+
+mpl_pane = pn.pane.Matplotlib(sensor_figure, dpi=150)
 
 # Callback
 count = 0
@@ -87,7 +101,7 @@ def on_download(event):
 
 download_button.on_click(on_download)
 
-def emit_count():
+def emit():
     if not run_toggle.value:
         return
     
@@ -106,8 +120,13 @@ def emit_count():
     error_buffer.append(sensor.error*1e6)
 
     im = sensor.image
+    immax = np.max(im)
+    immin = np.min(im)
+
+    terminal.write('%d (max) %d (min)\n'%(immax,immin))
+    
     im = im - background_adjustment_input.value
-    im = (im - clim_lower.value)/(clim_upper.value - clim_lower.value)
+    im = (im - clim_lower_input.value)/(clim_upper_input.value - clim_lower_input.value)
 
     
     h1.set_data(im)
@@ -127,7 +146,7 @@ def emit_count():
     mpl_pane.object = sensor_figure
     count += 1
 
-pn.state.add_periodic_callback(emit_count, period=100, count=999);
+pn.state.add_periodic_callback(emit, period=100, count=999);
 
 
 # Layout
@@ -135,11 +154,12 @@ pn.state.add_periodic_callback(emit_count, period=100, count=999);
 app = pn.Row(pn.Column(pn.pane.Markdown("**CIAO Wavefront Sensor**"),
                        exposure_time_input,
                        background_adjustment_input,
-                       clim_lower,
-                       clim_upper,
+                       clim_lower_input,
+                       clim_upper_input,
                        run_toggle,
                        download_button,
                        calibrate_button,
+                       terminal,
                        width=300,
                        css_classes=['panel-widget-box']),
              pn.Column(mpl_pane,
