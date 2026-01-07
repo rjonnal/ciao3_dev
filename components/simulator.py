@@ -28,8 +28,8 @@ class Simulator:
         self.wavefront = np.zeros((self.sy,self.sx))
 
         # Some parameters for the spots image:
-        self.dc = 100
-        self.spots_range = 2000
+        self.dc = 10
+        self.spots_range = 2**ccfg.bit_depth-1
         self.spots = np.ones((self.sy,self.sx))*self.dc
         self.image = self.spots.astype(np.uint16)
         self.spots = self.noise(self.spots)
@@ -187,7 +187,7 @@ class Simulator:
         
         self.error = self.get_error(self.baseline_error_sigma)
 
-        self.exposure_us = 10000
+        self.exposure_us = ccfg.default_exposure_us
         
         self.paused = False
         self.logging = False
@@ -310,7 +310,7 @@ class Simulator:
         self.frame_timer.tick()
         spots = (self.spots-self.spots.min())/(self.spots.max()-self.spots.min())*self.spots_range*float(self.exposure_us)/20000.+self.dc
         nspots = self.noise(spots)
-        nspots = np.clip(nspots,0,4095)
+        nspots = np.clip(nspots,0,2**ccfg.bit_depth-1)
         nspots = np.round(nspots).astype(np.int16)
         self.image = nspots
         return nspots

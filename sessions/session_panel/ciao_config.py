@@ -26,6 +26,13 @@ pixel_format = 'Mono8'
 ciao_session = '.'
 ciao_session = os.path.split(__file__)[0]
 
+# panel-specific settings for portable WFS
+figsize = (5,3)
+min_exposure_us = 1000
+max_exposure_us = 1000000
+step_exposure_us = 1000
+default_exposure_us = 5000
+
 # define some directories for configuration files
 reference_directory = ciao_session + '/etc/ref/'
 dm_directory = ciao_session + '/etc/dm/'

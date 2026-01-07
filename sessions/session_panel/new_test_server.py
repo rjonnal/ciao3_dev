@@ -1,8 +1,13 @@
 import panel as pn
 import random
-from ciao3_dev.components import simulator
 from ciao3_dev.components import sensors,loops
-from ciao3_dev.components import sensors,loops
+import ciao_config as ccfg
+
+if ccfg.camera_id=='pylon':
+    from ciao3_dev.components import cameras
+elif ccfg.camera_id=='simulator':
+    from ciao3_dev.components import simulator
+    
 import sys,os
 from matplotlib import pyplot as plt
 import numpy as np
@@ -31,15 +36,19 @@ pn.extension(raw_css=[css])
 #pn.extension('ipywidgets')
 
 # Set up sensor
-cam = cameras.PylonCamera()
+if ccfg.camera_id=='pylon':
+    cam = cameras.PylonCamera()
+elif ccfg.camera_id=='simulator':
+    cam = simulator.Simulator()
+    
 sensor = sensors.Sensor(cam)
 sensor.remove_tip_tilt = True
 sensor.sense()
 
-error_buffer = [0]*100
+error_buffer = [0]*ccfg.plot_buffer_length
 
 # Set up sensor figure
-sensor_figure = plt.figure(figsize=(5,3))
+sensor_figure = plt.figure(figsize=ccfg.figsize)
 #[[ax1,ax2],[ax3,ax4]] = sensor_figure.subplots(2,2)
 
 border = .03
@@ -69,17 +78,19 @@ zidx = np.arange(len(sensor.zernikes))
 h3 = ax3.plot(zidx,sensor.zernikes,'ks',markersize=2,linestyle='none')
 h4 = ax4.plot(iterations,error_buffer,'b-')
 
+im_min = 0
+im_max = 2**ccfg.bit_depth-1
 
 # Widgets
-exposure_time_input = pn.widgets.IntSlider(name='Exposure Time (ms)', start=10,end=1000,step=10,value=150)
-#background_adjustment_input = pn.widgets.IntInput(name='Background Adjustemnt (ADU)', value=0)
+exposure_time_input = pn.widgets.IntSlider(name='Exposure Time (ms)', start=ccfg.min_exposure_us,end=ccfg.max_exposure_us,step=ccfg.step_exposure_us,value=ccfg.default_exposure_us)
 
-background_adjustment_input = pn.widgets.IntSlider(name='Background Adjustment',start=0,end=4095,step=1,value=0)
-clim_lower_input = pn.widgets.IntSlider(name='Lower Contrast Limt',start=0,end=4095,step=1,value=0)
-clim_upper_input = pn.widgets.IntSlider(name='Upper Contrast Limt',start=0,end=4095,step=1,value=4095)
+background_adjustment_input = pn.widgets.IntSlider(name='Background Adjustment',start=im_min,end=im_max,step=1,value=0)
+clim_lower_input = pn.widgets.IntSlider(name='Lower Contrast Limt',start=im_min,end=im_max,step=1,value=im_min)
+clim_upper_input = pn.widgets.IntSlider(name='Upper Contrast Limt',start=im_min,end=im_max,step=1,value=im_max)
 
 
-run_toggle = pn.widgets.button.Toggle(name='Run', button_type='primary')
+run_toggle = pn.widgets.RadioButtonGroup(name='Run', button_type='default', options=['Pause', 'Run'], value='Pause'
+        )
 download_button = pn.widgets.Button(name='Download data', button_type='primary')
 calibrate_button = pn.widgets.Button(name='Record reference', button_type='primary')
 
@@ -100,14 +111,14 @@ def on_download(event):
 download_button.on_click(on_download)
 
 def emit():
-    if not run_toggle.value:
+    if not run_toggle.value=='Run':
         return
     
     global count,sensor,error_buffer,h1,h2,h3,h4,sensor_figure,mpl_pane
     global ax1,ax2,ax3,ax4,iterations
 
 
-    sensor.cam.set_exposure(1000*exposure_time_input.value)
+    sensor.cam.set_exposure(exposure_time_input.value)
     sensor.background_correction = background_adjustment_input.value
     sensor.sense()
 
