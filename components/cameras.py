@@ -45,6 +45,19 @@ class PylonCamera:
         self.timeout = timeout
         self.image = None
 
+        # Enable sensor binning
+        # Note: Available on selected camera models only
+        self.camera.BinningSelector.Value = "Sensor"
+        # Enable horizontal binning by 4
+        self.camera.BinningHorizontal.Value = ccfg.binning_horizontal
+        # Enable vertical binning by 2
+        self.camera.BinningVertical.Value = ccfg.binning_vertical
+        # Set the horizontal binning mode to Average
+        self.camera.BinningHorizontalMode.Value = "Average"
+        # Set the vertical binning mode to Sum
+        self.camera.BinningVerticalMode.Value = "Average"
+
+        
     def get_image(self):
         self.image = self.camera.GrabOne(self.timeout).Array.astype(np.int16)
         return self.image
@@ -58,6 +71,8 @@ class PylonCamera:
         
     def get_exposure(self):
         return int(self.camera.ExposureTime.Value)
+
+    
     
 
 class XimeaCamera:

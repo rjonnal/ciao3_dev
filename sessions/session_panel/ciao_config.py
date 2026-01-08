@@ -15,13 +15,21 @@ mirror_id = 'HSDM97-15-010'
 
 # An identifier for the camera; can be 'ace', 'pylon', or
 # 'simulator'
-camera_id = 'pylon'
+camera_id = 'simulator'
 
 import os # 
-image_width_px = 2048
+
+
+# camera parameters
+# Basler acA2500-60um
+# sensor size: 2,590 x 2,048 
+image_width_px = 2590
 image_height_px = 2048
 bit_depth = 8
 pixel_format = 'Mono8'
+binning_horizontal = 4
+binning_vertical = 4
+
 
 ciao_session = '.'
 ciao_session = os.path.split(__file__)[0]

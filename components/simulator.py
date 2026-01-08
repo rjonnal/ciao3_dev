@@ -132,23 +132,24 @@ class Simulator:
             pass
 
         cfn = os.path.join(ccfg.simulator_cache_directory,'%s_actuator_basis.npy'%key)
-        
         try:
             self.actuator_basis = np.load(cfn)
             print('Loading cached actuator basis set...')
         except Exception as e:
+
             actuator_basis = []
             print('Building actuator basis set...')
             for x,y in zip(ax,ay):
+                print('actuator %0.1f,%0.1f'%(x,y))
                 xx = self.XX - x
                 yy = self.YY - y
                 surf = np.exp((-(xx**2+yy**2)/(2*actuator_sigma**2)))
                 surf = (surf - surf.min())/(surf.max()-surf.min())
                 actuator_basis.append(surf.ravel())
-                plt.clf()
-                plt.imshow(surf)
-                plt.title('generating actuator basis\n%0.2e,%0.2e'%(x,y))
-                plt.pause(.1)
+                # plt.clf()
+                # plt.imshow(surf)
+                # plt.title('generating actuator basis\n%0.2e,%0.2e'%(x,y))
+                # plt.pause(.1)
 
             self.actuator_basis = np.array(actuator_basis)
             np.save(cfn,self.actuator_basis)
@@ -164,6 +165,7 @@ class Simulator:
             print('Building zernike basis set...')
             #zernike = Zernike()
             for z in range(self.n_zernike_terms):
+                print('Zernike %d of %d...'%(z,self.n_zernike_terms))
                 surf = self.zernike.get_j_surface(z,self.XX,self.YY)
                 zernike_basis.append(surf.ravel())
 
