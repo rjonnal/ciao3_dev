@@ -34,7 +34,7 @@ class PylonCamera:
             pylon.TlFactory.GetInstance().CreateFirstDevice())
 
         self.camera.Open()
-        self.camera.PixelFormat.Value = ccfg.pixel_format
+        self.camera.PixelFormat.Value = ccfg.pylon_pixel_format
         # enable all chunks
         self.camera.ChunkModeActive = True
         

@@ -2,31 +2,39 @@
 # ciao installation. Where appropriate, each parameter's final
 # characters represent units. 
 
+import os # we need this to get the working directory for session management
+
 ##############################################################
-# Use simulated camera and mirror (True) or simulate these (False):
-simulate = True
 # A unique, permanent identifier for the optical system
-# associated with this installation of ciao:
+# associated with this installation of ciao. This is used just for
+# labeling output such as logs and other AO data, to avoid confusion
+# among installations.
 system_id = 'simulator'
 
 # An identifier for the deformable mirror, used to load
-# the correct configuration files:
+# the correct configuration files. Use None if this is a session
+# for wavefront sensing only.
 mirror_id = 'HSDM97-15-010'
 
 # An identifier for the camera; can be 'ace', 'pylon', or
-# 'simulator'
+# 'simulator'; this is important, as it determines which camera
+# libraries to load and use.
 camera_id = 'simulator'
-
-import os # 
-
 
 # camera parameters
 # Basler acA2500-60um
 # sensor size: 2,590 x 2,048 
+# The deminsions below should be the native hardware dimensions,
+# not the dimensions after binning. These will be used to confirm
+# that the grabbed images are the right size (when using a real
+# camera) and to generate images that are the right size (when
+# using simulation mode).
 image_width_px = 2590
 image_height_px = 2048
+
+# other camera parameters
 bit_depth = 8
-pixel_format = 'Mono8'
+pylon_pixel_format = 'Mono8'
 binning_horizontal = 4
 binning_vertical = 4
 
