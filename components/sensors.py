@@ -74,6 +74,14 @@ class Sensor:
         
         self.n_lenslets = self.search_boxes.n
         n_lenslets = self.n_lenslets
+
+        # make x and y meshes of search box centers
+        # these can be used in combination with self.sensor mask
+        # to visualize the beam profile later
+        self.mask_coordinates_x_m = np.arange(self.sensor_mask.shape[1])*ccfg.lenslet_pitch_m
+        self.mask_coordinates_y_m = np.arange(self.sensor_mask.shape[0])*ccfg.lenslet_pitch_m
+        self.mask_XX_m,self.mask_YY_m = np.meshgrid(self.mask_coordinates_x_m,self.mask_coordinates_y_m)
+        
         self.image = np.zeros((ccfg.image_height_px,ccfg.image_width_px))
         self.x_slopes = np.zeros(n_lenslets)
         self.y_slopes = np.zeros(n_lenslets)
@@ -543,7 +551,6 @@ class Sensor:
 
             
     def get_profile(self):
-        print(self.box_means.shape)
         xarr = self.search_boxes.x
         yarr = self.search_boxes.y
         iarr = self.box_means
@@ -562,6 +569,7 @@ class Sensor:
         profile[np.where(self.sensor_mask)] = iarr
         gaussian_fit = np.zeros(self.sensor_mask.shape)
         gaussian_fit[np.where(self.sensor_mask)] = gaussian2d((xarr,yarr),*res)
+        
         out = {}
         out['xcom'] = xcom
         out['ycom'] = ycom

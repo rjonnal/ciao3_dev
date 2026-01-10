@@ -108,6 +108,7 @@ loop_condition_ulim = 1000.
 loop_condition_llim = 1.0
 
 n_zernike_terms = 66
+n_zernike_display = 15
 zernike_dioptric_equivalent = 1.5
 
 # simulation settings
