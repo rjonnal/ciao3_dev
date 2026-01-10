@@ -152,7 +152,16 @@ class SpotsView(View):
     def __init__(self,sensor,fig):
         super().__init__(sensor,fig)
         self.handle = self.ax.imshow(sensor.image)
+        sb = sensor.search_boxes
+        x1vec = sb.x1
+        x2vec = sb.x2
+        y1vec = sb.y1
+        y2vec = sb.y2
 
+        for x1,x2,y1,y2 in zip(x1vec,x2vec,y1vec,y2vec):
+            self.ax.plot([x1,x2,x2,x1,x1],[y1,y1,y2,y2,y1],'y-',linewidth=0.25)
+            
+        
     def update(self):
         self.handle.set_data(sensor.image)
 
@@ -168,9 +177,18 @@ class ProfileFitView(View):
     def __init__(self,sensor,fig):
         super().__init__(sensor,fig)
         self.handle = self.ax.imshow(self.sensor.get_profile()['gaussian_fit'],cmap='autumn')
-
+        xcom = self.sensor.get_profile()['xcom']
+        ycom = self.sensor.get_profile()['ycom']
+        
+        self.com_handle = self.ax.plot([xcom],[ycom],'ko')[0]
+        
     def update(self):
         self.handle.set_data(self.sensor.get_profile()['gaussian_fit'])
+        xcom = self.sensor.get_profile()['xcom']
+        ycom = self.sensor.get_profile()['ycom']
+        self.com_handle.set_xdata([xcom])
+        self.com_handle.set_ydata([ycom])
+        
 
 class ProfileFitView3D(View):
     def __init__(self,sensor,fig):
@@ -209,7 +227,7 @@ class WavefrontView3D(View):
 zv = ZernikeView(sensor,figure_dict['Zernike'])
 sv = SpotsView(sensor,figure_dict['Spots'])
 pv = ProfileView(sensor,figure_dict['Profile'])
-pfv = ProfileFitView3D(sensor,figure_dict['Profile fit'])
+pfv = ProfileFitView(sensor,figure_dict['Profile fit'])
 wfv = WavefrontView3D(sensor,figure_dict['Wavefront'])
 ev = ErrorView(sensor,figure_dict['Error'])
 dv = DefocusView(sensor,figure_dict['Defocus'])
