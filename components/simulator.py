@@ -23,8 +23,8 @@ class Simulator:
         
         # We need to define a meshes on which to build the simulated spots images
         # and the simulated wavefront:
-        self.sy = ccfg.image_height_px
-        self.sx = ccfg.image_width_px
+        self.sy = ccfg.image_height_px//ccfg.binning
+        self.sx = ccfg.image_width_px//ccfg.binning
         self.wavefront = np.zeros((self.sy,self.sx))
 
         # Some parameters for the spots image:
@@ -33,13 +33,13 @@ class Simulator:
         self.spots = np.ones((self.sy,self.sx))*self.dc
         self.image = self.spots.astype(np.uint16)
         self.spots = self.noise(self.spots)
-        self.pixel_size_m = ccfg.pixel_size_m
+        self.binned_pixel_size_m = ccfg.pixel_size_m*ccfg.binning
 
         # compute single spot
         self.lenslet_pitch_m = ccfg.lenslet_pitch_m
         self.f = ccfg.lenslet_focal_length_m
         self.L = ccfg.wavelength_m
-        fwhm_px = (1.22*self.L*self.f/self.lenslet_pitch_m)/self.pixel_size_m
+        fwhm_px = (1.22*self.L*self.f/self.lenslet_pitch_m)/self.binned_pixel_size_m
         
         xvec = np.arange(self.sx)
         yvec = np.arange(self.sy)
@@ -47,21 +47,24 @@ class Simulator:
         yvec = yvec-yvec.mean()
         XX,YY = np.meshgrid(xvec,yvec)
         d = np.sqrt(XX**2+YY**2)
+
+        sigma = ccfg.simulated_beam_gaussian_sigma_px
+        self.beam_profile = np.exp(-d/(2*sigma**2))
+        self.beam_profile = self.beam_profile/np.max(self.beam_profile)
         
         self.beam_diameter_m = ccfg.beam_diameter_m
         self.beam_radius_m = self.beam_diameter_m/2.0
         
         self.disc_diameter = 170
-        #self.disc_diameter = ccfg.beam_diameter_m/self.pixel_size_m # was just set to 110
+        #self.disc_diameter = ccfg.beam_diameter_m/self.binned_pixel_size_m # was just set to 110
         
         self.disc = np.zeros((self.sy,self.sx))
         self.disc[np.where(d<=self.disc_diameter)] = 1.0
         
-        self.X = np.arange(self.sx,dtype=float)*self.pixel_size_m
-        self.Y = np.arange(self.sy,dtype=float)*self.pixel_size_m
+        self.X = np.arange(self.sx,dtype=float)*self.binned_pixel_size_m
+        self.Y = np.arange(self.sy,dtype=float)*self.binned_pixel_size_m
         self.X = self.X-self.X.mean()
         self.Y = self.Y-self.Y.mean()
-        
         self.XX,self.YY = np.meshgrid(self.X,self.Y)
 
 
@@ -82,15 +85,14 @@ class Simulator:
 
         xx = xx - float(d_lenslets-1)/2.0
         yy = yy - float(d_lenslets-1)/2.0
-
         d = np.sqrt(xx**2+yy**2)
 
         self.lenslet_mask = np.zeros(xx.shape,dtype=np.uint8)
         self.lenslet_mask[np.where(d<=rad)] = 1
         self.n_lenslets = int(np.sum(self.lenslet_mask))
 
-        self.x_lenslet_coords = xx*self.lenslet_pitch_m/self.pixel_size_m+self.sx/2.0
-        self.y_lenslet_coords = yy*self.lenslet_pitch_m/self.pixel_size_m+self.sy/2.0
+        self.x_lenslet_coords = xx*self.lenslet_pitch_m/self.binned_pixel_size_m+self.sx/2.0
+        self.y_lenslet_coords = yy*self.lenslet_pitch_m/self.binned_pixel_size_m+self.sy/2.0
         in_pupil = np.where(self.lenslet_mask)
         self.x_lenslet_coords = self.x_lenslet_coords[in_pupil]
         self.y_lenslet_coords = self.y_lenslet_coords[in_pupil]
@@ -286,11 +288,11 @@ class Simulator:
                                                    self.lenslet_boxes.y2)):
             subwf = self.wavefront[y1:y2+1,x1:x2+1]
             yslope = np.mean(np.diff(subwf.mean(1)))
-            dy = yslope*self.f/self.pixel_size_m
+            dy = yslope*self.f/self.binned_pixel_size_m
             ycentroid = y+dy
             ypx = int(round(y+dy))
             xslope = np.mean(np.diff(subwf.mean(0)))
-            dx = xslope*self.f/self.pixel_size_m
+            dx = xslope*self.f/self.binned_pixel_size_m
             xcentroid = x+dx
             
             #if idx==20:
@@ -310,7 +312,16 @@ class Simulator:
     def get_image(self):
         self.update()
         self.frame_timer.tick()
-        spots = (self.spots-self.spots.min())/(self.spots.max()-self.spots.min())*self.spots_range*float(self.exposure_us)/20000.+self.dc
+        normalized = (self.spots-self.spots.min())/(self.spots.max()-self.spots.min())
+        spots = normalized*self.spots_range
+        spots = spots*(self.exposure_us/ccfg.simulated_saturation_time_us)
+        spots = spots+self.dc
+        spots = spots*self.beam_profile
+        # plt.imshow(spots)
+        # plt.title(self.beam_profile.max())
+        # plt.colorbar()
+        # plt.show()
+        # sys.exit()
         nspots = self.noise(spots)
         nspots = np.clip(nspots,0,2**ccfg.bit_depth-1)
         nspots = np.round(nspots).astype(np.int16)

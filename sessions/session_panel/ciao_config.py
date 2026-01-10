@@ -35,8 +35,8 @@ image_height_px = 2048
 # other camera parameters
 bit_depth = 8
 pylon_pixel_format = 'Mono8'
-binning_horizontal = 4
-binning_vertical = 4
+binning = 4
+pixel_size_m = 4.8e-6 # native pixel size, not binned pixel size
 
 
 ciao_session = '.'
@@ -47,7 +47,7 @@ figsize = (5,3)
 min_exposure_us = 1000
 max_exposure_us = 1000000
 step_exposure_us = 1000
-default_exposure_us = 5000
+default_exposure_us = 15000
 
 # define some directories for configuration files
 reference_directory = ciao_session + '/etc/ref/'
@@ -65,11 +65,10 @@ poke_filename = poke_directory + 'poke.txt'
 
 # sensor settings:
 reference_n_measurements = 10
-lenslet_pitch_m = 500e-6
-lenslet_focal_length_m = 20.0e-3
-pixel_size_m = 40e-6
+lenslet_pitch_m = 300e-6
+lenslet_focal_length_m = 14.2e-3
 
-beam_diameter_m = 10e-3
+beam_diameter_m = 9e-3
 interface_scale_factor = 0.75
 wavelength_m = 840e-9
 estimate_background = True
@@ -110,6 +109,10 @@ loop_condition_llim = 1.0
 
 n_zernike_terms = 66
 zernike_dioptric_equivalent = 1.5
+
+# simulation settings
+simulated_beam_gaussian_sigma_px = 20
+simulated_saturation_time_us = 20000
 
 # UI settings:
 ui_width_px = 1200

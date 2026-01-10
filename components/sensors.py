@@ -2,7 +2,7 @@ import numpy as np
 import time
 from ciao3_dev.components import centroid
 import sys
-
+import scipy.optimize as spo
 import os
 from matplotlib import pyplot as plt
 import datetime
@@ -23,14 +23,14 @@ class Sensor:
 
     def __init__(self,camera):
         self.cam = camera
-        self.image_width_px = ccfg.image_width_px
-        self.image_height_px = ccfg.image_height_px
+        self.image_width_px = ccfg.image_width_px//ccfg.binning
+        self.image_height_px = ccfg.image_height_px//ccfg.binning
         self.dark_image = np.zeros((ccfg.image_height_px,ccfg.image_width_px),dtype=np.int16)
         self.dark_subtract = False
         self.n_dark = 10
         self.lenslet_pitch_m = ccfg.lenslet_pitch_m
         self.lenslet_focal_length_m = ccfg.lenslet_focal_length_m
-        self.pixel_size_m = ccfg.pixel_size_m
+        self.binned_pixel_size_m = ccfg.pixel_size_m*ccfg.binning
         self.beam_diameter_m = ccfg.beam_diameter_m
         self.wavelength_m = ccfg.wavelength_m
         self.background_correction = ccfg.background_correction
@@ -44,7 +44,7 @@ class Sensor:
         # calculate diffraction limited spot size on sensor, to determine
         # the centroiding window size
         lenslet_dlss = 1.22*self.wavelength_m*self.lenslet_focal_length_m/self.lenslet_pitch_m
-        lenslet_dlss_px = lenslet_dlss/self.pixel_size_m
+        lenslet_dlss_px = lenslet_dlss/self.binned_pixel_size_m
         # now we need to account for smearing of spots due to axial displacement of retinal layers
         extent = 500e-6 # retinal thickness
         smear = extent*6.75/16.67 # pupil diameter and focal length; use diameter in case beacon is at edge of field
@@ -53,16 +53,16 @@ class Sensor:
         except Exception as e:
             magnification = 1.0
         total_size = lenslet_dlss+smear*magnification
-        total_size_px = total_size/self.pixel_size_m
+        total_size_px = total_size/self.binned_pixel_size_m
         self.centroiding_half_width = int(np.floor(total_size_px/2.0))*2
         
         try:
             xy = np.loadtxt(ccfg.reference_coordinates_filename)
         except Exception as e:
-            self.bootstrap_reference()
+            #self.bootstrap_reference()
             xy = np.loadtxt(ccfg.reference_coordinates_bootstrap_filename)
             #print('Bootstrapping with %s'%ccfg.reference_coordinates_bootstrap_filename)
-            
+
         self.search_boxes = SearchBoxes(xy[:,0],xy[:,1],ccfg.search_box_half_width)
         self.sensor_mask = np.loadtxt(ccfg.reference_mask_filename)
         
@@ -190,7 +190,7 @@ class Sensor:
         # Load data and initialize variables.
         reference_mask = np.loadtxt(ccfg.reference_mask_filename)
         d_lenslets = reference_mask.shape[0] # assumed to be square
-        pixels_per_lenslet = float(ccfg.lenslet_pitch_m)/float(ccfg.pixel_size_m)
+        pixels_per_lenslet = float(ccfg.lenslet_pitch_m)/float(self.binned_pixel_size_m)
         total_width = d_lenslets*pixels_per_lenslet
         border = (im.shape[0]-total_width)/2.0+pixels_per_lenslet/2.0
 
@@ -218,8 +218,7 @@ class Sensor:
         lenslet_pitch_m = ccfg.lenslet_pitch_m
         f = ccfg.lenslet_focal_length_m
         L = ccfg.wavelength_m
-        pixel_size_m = ccfg.pixel_size_m
-        spot_sigma = (1.22*L*f/lenslet_pitch_m)/pixel_size_m
+        spot_sigma = (1.22*L*f/lenslet_pitch_m)/self.binned_pixel_size_m
         template = gaussian_convolve(template,spot_sigma)
         template = (template-template.mean())/(template.std())
         im = (im-im.mean())/(im.std())
@@ -480,8 +479,8 @@ class Sensor:
                                     verbose_p = 0,
                                     num_threads_p = 1)
         self.centroiding_time = time.time()-t0
-        self.x_slopes = (self.x_centroids-self.search_boxes.x)*self.pixel_size_m/self.lenslet_focal_length_m
-        self.y_slopes = (self.y_centroids-self.search_boxes.y)*self.pixel_size_m/self.lenslet_focal_length_m
+        self.x_slopes = (self.x_centroids-self.search_boxes.x)*self.binned_pixel_size_m/self.lenslet_focal_length_m
+        self.y_slopes = (self.y_centroids-self.search_boxes.y)*self.binned_pixel_size_m/self.lenslet_focal_length_m
         
         self.tilt = np.mean(self.x_slopes)
         self.tip = np.mean(self.y_slopes)
@@ -542,7 +541,40 @@ class Sensor:
             print(self.error)
             sys.exit()
 
+            
+    def get_profile(self):
+        print(self.box_means.shape)
+        xarr = self.search_boxes.x
+        yarr = self.search_boxes.y
+        iarr = self.box_means
+        denom = np.sum(iarr)
+        xcom = np.sum(xarr*iarr)/denom
+        ycom = np.sum(yarr*iarr)/denom
+        
+        def gaussian2d(xy, A, x0, y0, sigma, offset):
+            x,y = xy
+            g = A * np.exp(-((x-x0)**2+(y-y0)**2)/(2*sigma**2)) + offset
+            return g.ravel()
 
+        initial_guess = (np.max(iarr),xcom,ycom,100,10)
+        res, pcov = spo.curve_fit(gaussian2d, (xarr, yarr), iarr, p0=initial_guess)
+        profile = np.zeros(self.sensor_mask.shape)
+        profile[np.where(self.sensor_mask)] = iarr
+        gaussian_fit = np.zeros(self.sensor_mask.shape)
+        gaussian_fit[np.where(self.sensor_mask)] = gaussian2d((xarr,yarr),*res)
+        out = {}
+        out['xcom'] = xcom
+        out['ycom'] = ycom
+        out['amplitude'] = res[0]
+        out['x0'] = res[1]
+        out['y0'] = res[2]
+        out['sigma'] = res[3]
+        out['offset'] = res[4]
+        out['gaussian_fit'] = gaussian_fit
+        out['profile'] = profile
+        return out
+        
+            
     def record_reference(self):
 
         print('recording reference')
@@ -610,9 +642,9 @@ class Sensor:
                 if mask[y,x]:
                     print(y,x)
                     y_m = y*self.lenslet_pitch_m
-                    y_px = y_m/self.pixel_size_m+border
+                    y_px = y_m/self.binned_pixel_size_m+border
                     x_m = x*self.lenslet_pitch_m
-                    x_px = x_m/self.pixel_size_m+border
+                    x_px = x_m/self.binned_pixel_size_m+border
                     new_xref.append(x_px)
                     new_yref.append(y_px)
 
@@ -624,10 +656,9 @@ class Sensor:
                     if mask[y,x]:
                         print(y,x)
                         y_m = y*self.lenslet_pitch_m
-                        y_px = y_m/self.pixel_size_m+border
+                        y_px = y_m/self.binned_pixel_size_m+border
                         x_m = x*self.lenslet_pitch_m
-                        x_px = x_m/self.pixel_size_m+border
-                        
+                        x_px = x_m/self.binned_pixel_size_m+border
                         xx = XX-x_px
                         yy = YY-y_px
                         temp = np.exp(-(xx**2+yy**2)/(2*sigma**2))

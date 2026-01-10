@@ -16,16 +16,16 @@ pn.extension('terminal')
 
 css = '''
 .bk.panel-widget-box {
-font-size: 6px;
+font-size: 10px;
 }
 .bk-input-group {
-font-size: 6px;
+font-size: 10px;
 }
 .bk-input {
-font-size: 6px;
+font-size: 10px;
 }
 .bk-btn {
-font-size: 6px;
+font-size: 10px;
 }
 
 '''
@@ -47,6 +47,39 @@ else:
 sensor = sensors.Sensor(cam)
 sensor.remove_tip_tilt = True
 sensor.sense()
+
+
+view_options=['Spots','Profile','Wavefront','Zernike','Error','Defocus','Astig0','Astig45']
+figure_dict = {}
+axes_dict = {}
+for vo in view_options:
+    figure_dict[vo] = plt.figure(figsize=ccfg.figsize)
+    axes_dict[vo] = figure_dict[vo].subplots(1,1)
+
+
+class View:
+
+    def __init__(self,sensor,fig):
+        self.fig = fig
+        self.sensor = sensor
+        self.ax = fig.axes[0]
+        
+    def update(self):
+        # ...
+        pass
+
+class SpotsView(View):
+
+    def __init__(self,sensor,fig):
+        super().__init__(sensor,fig)
+
+    def update(self):
+        print(self.ax)
+        sys.exit()
+
+sv = SpotsView(sensor,figure_dict['Spots'])
+sv.update()
+sys.exit()
 
 error_buffer = [0]*ccfg.plot_buffer_length
 
@@ -85,7 +118,7 @@ im_min = 0
 im_max = 2**ccfg.bit_depth-1
 
 # Widgets
-exposure_time_input = pn.widgets.IntSlider(name='Exposure Time (ms)', start=ccfg.min_exposure_us,end=ccfg.max_exposure_us,step=ccfg.step_exposure_us,value=ccfg.default_exposure_us)
+exposure_time_input = pn.widgets.IntSlider(name='Exposure Time (us)', start=ccfg.min_exposure_us,end=ccfg.max_exposure_us,step=ccfg.step_exposure_us,value=ccfg.default_exposure_us)
 
 background_adjustment_input = pn.widgets.IntSlider(name='Background Adjustment',start=im_min,end=im_max,step=1,value=0)
 clim_lower_input = pn.widgets.IntSlider(name='Lower Contrast Limt',start=im_min,end=im_max,step=1,value=im_min)
@@ -96,6 +129,7 @@ run_toggle = pn.widgets.RadioButtonGroup(name='Run', button_type='default', opti
         )
 download_button = pn.widgets.Button(name='Download data', button_type='primary')
 calibrate_button = pn.widgets.Button(name='Record reference', button_type='primary')
+mode_selector = pn.widgets.Select(name='Select', options=['Spots','Profile','Wavefront','Zernike','Error','Defocus','Astig0','Astig45'])
 
 terminal = pn.widgets.Terminal(
     "Spots image statistics\n",
@@ -154,12 +188,12 @@ def emit():
     ax4.set_ylim((np.min(error_buffer),np.max(error_buffer)))
     ax4.set_xlim((iterations[0],iterations[-1]))
     
-    #sensor_figure.canvas.draw()
-    #sensor_figure.canvas.flush_events()
+    sensor_figure.canvas.draw()
+    sensor_figure.canvas.flush_events()
     mpl_pane.object = sensor_figure
     count += 1
 
-pn.state.add_periodic_callback(emit, period=1000, count=999);
+pn.state.add_periodic_callback(emit, period=500, count=999);
 
 
 # Layout
@@ -172,9 +206,11 @@ app = pn.Row(pn.Column(pn.pane.Markdown("**CIAO Wavefront Sensor**"),
                        run_toggle,
                        download_button,
                        calibrate_button,
+                       mode_selector,
                        terminal,
                        width=300,
                        css_classes=['panel-widget-box']),
+             pn.Column(width=10),
              pn.Column(mpl_pane,
                        width=900),
              )

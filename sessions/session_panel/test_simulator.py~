@@ -159,7 +159,7 @@ def emit():
     mpl_pane.object = sensor_figure
     count += 1
 
-pn.state.add_periodic_callback(emit, period=1000, count=999);
+pn.state.add_periodic_callback(emit, period=200, count=999);
 
 
 # Layout

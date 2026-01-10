@@ -19,7 +19,7 @@ except Exception as e:
     print(e)
     N = 1
 
-if ccfg.simulate:
+if ccfg.camera_id=='simulator':
     cam = simulator.Simulator()
 else:
     cam = cameras.get_camera()
@@ -41,7 +41,7 @@ im = im/float(N)
 # Load data and initialize variables.
 reference_mask = np.loadtxt(ccfg.reference_mask_filename)
 d_lenslets = reference_mask.shape[0] # assumed to be square
-pixels_per_lenslet = float(ccfg.lenslet_pitch_m)/float(ccfg.pixel_size_m)
+pixels_per_lenslet = float(ccfg.lenslet_pitch_m)/float(ccfg.pixel_size_m)/float(ccfg.binning)
 total_width = d_lenslets*pixels_per_lenslet
 border = (im.shape[0]-total_width)/2.0+pixels_per_lenslet/2.0
 
