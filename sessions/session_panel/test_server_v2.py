@@ -52,7 +52,7 @@ sensor.remove_tip_tilt = True
 sensor.sense()
 
 
-view_options=['Spots','Profile','Profile fit','Wavefront','Zernike','Error','Defocus','Astig0','Astig45']
+view_options=['Spots','Profile','Profile fit','Wavefront','Profile fit surface','Wavefront surface','Zernike','Error','Defocus','Astig0','Astig45']
 figure_dict = {}
 axes_dict = {}
 for vo in view_options:
@@ -205,10 +205,10 @@ class ProfileFitView3D(View):
 class WavefrontView(View):
     def __init__(self,sensor,fig):
         super().__init__(sensor,fig)
-        self.handle = self.ax.imshow(self.sensor.get_profile()['wavefront'],cmap='bone')
+        self.handle = self.ax.imshow(self.sensor.wavefront)
         
     def update(self):
-        self.handle.set_data(self.sensor.get_profile()['wavefront'])
+        self.handle.set_data(self.sensor.wavefront)
 
 class WavefrontView3D(View):
     def __init__(self,sensor,fig):
@@ -228,7 +228,9 @@ zv = ZernikeView(sensor,figure_dict['Zernike'])
 sv = SpotsView(sensor,figure_dict['Spots'])
 pv = ProfileView(sensor,figure_dict['Profile'])
 pfv = ProfileFitView(sensor,figure_dict['Profile fit'])
-wfv = WavefrontView3D(sensor,figure_dict['Wavefront'])
+pfv3d = ProfileFitView3D(sensor,figure_dict['Profile fit surface'])
+wfv = WavefrontView(sensor,figure_dict['Wavefront'])
+wfv3d = WavefrontView3D(sensor,figure_dict['Wavefront surface'])
 ev = ErrorView(sensor,figure_dict['Error'])
 dv = DefocusView(sensor,figure_dict['Defocus'])
 a0v = Astig0View(sensor,figure_dict['Astig0'])
