@@ -59,7 +59,7 @@ for vo in view_options:
     fig = plt.figure(figsize=ccfg.figsize)
     fig.suptitle(vo)
     figure_dict[vo] = fig
-    if vo in ['Profile fit','Wavefront']:
+    if vo in ['Profile fit surface','Wavefront surface']:
         axes_dict[vo] = figure_dict[vo].subplots(subplot_kw={"projection": "3d"})
     else:
         axes_dict[vo] = figure_dict[vo].subplots(1,1)
@@ -176,16 +176,21 @@ class ProfileView(View):
 class ProfileFitView(View):
     def __init__(self,sensor,fig):
         super().__init__(sensor,fig)
-        self.handle = self.ax.imshow(self.sensor.get_profile()['gaussian_fit'],cmap='autumn')
-        xcom = self.sensor.get_profile()['xcom']
-        ycom = self.sensor.get_profile()['ycom']
-        
+        dat = self.sensor.get_profile()['gaussian_fit']
+        dat[np.where(dat==0)] = np.nan
+        self.handle = self.ax.imshow(dat,cmap='autumn')
+        profile = self.sensor.get_profile()
+        xcom = profile['xcom']
+        ycom = profile['ycom']
         self.com_handle = self.ax.plot([xcom],[ycom],'ko')[0]
         
     def update(self):
-        self.handle.set_data(self.sensor.get_profile()['gaussian_fit'])
-        xcom = self.sensor.get_profile()['xcom']
-        ycom = self.sensor.get_profile()['ycom']
+        dat = self.sensor.get_profile()['gaussian_fit']
+        dat[np.where(dat==0)] = np.nan
+        self.handle.set_data(dat)
+        profile = self.sensor.get_profile()
+        xcom = profile['xcom']
+        ycom = profile['ycom']
         self.com_handle.set_xdata([xcom])
         self.com_handle.set_ydata([ycom])
         
@@ -205,10 +210,15 @@ class ProfileFitView3D(View):
 class WavefrontView(View):
     def __init__(self,sensor,fig):
         super().__init__(sensor,fig)
-        self.handle = self.ax.imshow(self.sensor.wavefront)
+        self.dat = np.zeros(self.sensor.wavefront.shape)
+        self.dat[:] = self.sensor.wavefront[:]
+        self.dat[np.where(self.dat==0)] = np.nan
+        self.handle = self.ax.imshow(self.dat)
         
     def update(self):
-        self.handle.set_data(self.sensor.wavefront)
+        self.dat[:] = self.sensor.wavefront[:]
+        self.dat[np.where(self.dat==0)] = np.nan
+        self.handle.set_data(self.dat)
 
 class WavefrontView3D(View):
     def __init__(self,sensor,fig):
@@ -253,7 +263,7 @@ run_toggle = pn.widgets.RadioButtonGroup(name='Run', button_type='default', opti
         )
 download_button = pn.widgets.Button(name='Download data', button_type='primary')
 calibrate_button = pn.widgets.Button(name='Record reference', button_type='primary')
-mode_selector = pn.widgets.Select(name='Select', options=['Spots','Profile','Profile fit','Wavefront','Zernike','Error','Defocus','Astig0','Astig45'])
+mode_selector = pn.widgets.Select(name='Select', options=['Spots','Profile','Profile fit','Profile fit surface','Wavefront','Wavefront surface','Zernike','Error','Defocus','Astig0','Astig45'])
 
 terminal = pn.widgets.Terminal(
     "Spots image statistics\n",
@@ -300,9 +310,15 @@ def emit():
     elif mode_selector.value=='Profile fit':
         pfv.update()
         mpl_pane.object = pfv.fig
+    elif mode_selector.value=='Profile fit surface':
+        pfv3d.update()
+        mpl_pane.object = pfv3d.fig
     elif mode_selector.value=='Wavefront':
         wfv.update()
         mpl_pane.object = wfv.fig
+    elif mode_selector.value=='Wavefront surface':
+        wfv3d.update()
+        mpl_pane.object = wfv3d.fig
     elif mode_selector.value=='Error':
         mpl_pane.object = ev.fig
     elif mode_selector.value=='Defocus':

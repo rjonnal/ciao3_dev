@@ -554,9 +554,20 @@ class Sensor:
         xarr = self.search_boxes.x
         yarr = self.search_boxes.y
         iarr = self.box_means
+        pixels_per_lenslet = ccfg.lenslet_pitch_m/ccfg.pixel_size_m
+
+        def coords_sensor_to_mask(x,y):
+            x = x - np.min(xarr)
+            y = y - np.min(yarr)
+            x = x/pixels_per_lenslet
+            y = y/pixels_per_lenslet
+            return x,y
+        
         denom = np.sum(iarr)
         xcom = np.sum(xarr*iarr)/denom
         ycom = np.sum(yarr*iarr)/denom
+        xcom = (xcom-np.min(xarr))/pixels_per_lenslet
+        ycom = (ycom-np.min(yarr))/pixels_per_lenslet
         
         def gaussian2d(xy, A, x0, y0, sigma, offset):
             x,y = xy
@@ -569,13 +580,18 @@ class Sensor:
         profile[np.where(self.sensor_mask)] = iarr
         gaussian_fit = np.zeros(self.sensor_mask.shape)
         gaussian_fit[np.where(self.sensor_mask)] = gaussian2d((xarr,yarr),*res)
+
+        x0 = res[1]
+        y0 = res[2]
+        x0 = (x0-np.min(xarr))/pixels_per_lenslet
+        y0 = (y0-np.min(yarr))/pixels_per_lenslet
         
         out = {}
         out['xcom'] = xcom
         out['ycom'] = ycom
         out['amplitude'] = res[0]
-        out['x0'] = res[1]
-        out['y0'] = res[2]
+        out['x0'] = x0
+        out['y0'] = y0
         out['sigma'] = res[3]
         out['offset'] = res[4]
         out['gaussian_fit'] = gaussian_fit

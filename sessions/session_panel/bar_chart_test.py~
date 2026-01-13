@@ -1,8 +1,0 @@
-import numpy as np
-from matplotlib import pyplot as plt
-
-cats = np.arange(10).astype(int)
-vals = np.random.rand(len(cats))
-
-plt.bar(cats,vals)
-plt.show()
